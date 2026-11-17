@@ -2,13 +2,16 @@ package com.example.BLOCO.auth.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDate;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,10 +24,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.example.BLOCO.auth.exception.EmailAlreadyRegisteredException;
 import com.example.BLOCO.auth.exception.InvalidCredentialsException;
+import com.example.BLOCO.auth.exception.InvalidSessionException;
+import com.example.BLOCO.auth.dto.CurrentUserResponse;
 import com.example.BLOCO.auth.dto.LoginRequest;
 import com.example.BLOCO.auth.dto.RegisterRequest;
 import com.example.BLOCO.auth.dto.UserResponse;
+import com.example.BLOCO.user.entity.DailyIntake;
 import com.example.BLOCO.user.entity.UserAccount;
+import com.example.BLOCO.user.repository.DailyIntakeRepository;
 import com.example.BLOCO.user.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,13 +40,16 @@ class AuthServiceTest {
 	@Mock
 	private UserRepository userRepository;
 
+	@Mock
+	private DailyIntakeRepository dailyIntakeRepository;
+
 	private PasswordEncoder passwordEncoder;
 	private AuthService authService;
 
 	@BeforeEach
 	void setUp() {
 		passwordEncoder = new BCryptPasswordEncoder();
-		authService = new AuthService(userRepository, passwordEncoder);
+		authService = new AuthService(userRepository, dailyIntakeRepository, passwordEncoder);
 	}
 
 	@Test
@@ -58,6 +68,8 @@ class AuthServiceTest {
 		assertEquals("Pessoa", response.name());
 		assertEquals("person@example.com", response.email());
 		assertEquals("(11) 99999-9999", response.phone());
+		assertEquals(0, savedUser.getBasalMetabolicRateKcal());
+		assertEquals(0, savedUser.getWaterConsumptionGoalMl());
 		assertNotEquals("senha-segura-123", savedUser.getPasswordHash());
 		assertTrue(passwordEncoder.matches("senha-segura-123", savedUser.getPasswordHash()));
 	}
@@ -99,5 +111,52 @@ class AuthServiceTest {
 
 		assertThrows(InvalidCredentialsException.class, () -> authService.login(
 			new LoginRequest("person@example.com", "senha-errada")));
+	}
+
+	@Test
+	void currentUserReturnsStoredNutritionMetrics() {
+		UserAccount user = UserAccount.create(
+			"Pessoa", "person@example.com", passwordEncoder.encode("senha-segura-123"), null);
+		when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+		CurrentUserResponse response = authService.getCurrentUser(user.getId());
+
+		assertEquals(user.getId(), response.id());
+		assertEquals("Pessoa", response.name());
+		assertEquals(0, response.basalMetabolicRateKcal());
+		assertEquals(0, response.estimatedDailyEnergyExpenditureKcal());
+		assertEquals(0, response.dailyCalorieConsumptionKcal());
+		assertEquals(0, response.waterConsumptionGoalMl());
+		assertEquals(0, response.dailyWaterConsumptionMl());
+		assertNull(response.age());
+		assertNull(response.gender());
+		assertNull(response.heightCm());
+		assertNull(response.weightKg());
+		assertNull(response.activityLevel());
+	}
+
+	@Test
+	void currentUserReturnsTodayIntakeFromDailyRecord() {
+		UserAccount user = UserAccount.create(
+			"Pessoa", "person@example.com", passwordEncoder.encode("senha-segura-123"), null);
+		DailyIntake dailyIntake = DailyIntake.create(user, LocalDate.now());
+		dailyIntake.addCalories(2100);
+		dailyIntake.addWater(900);
+		when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+		when(dailyIntakeRepository.findByUser_IdAndRecordDate(user.getId(), LocalDate.now()))
+			.thenReturn(Optional.of(dailyIntake));
+
+		CurrentUserResponse response = authService.getCurrentUser(user.getId());
+
+		assertEquals(2100, response.dailyCalorieConsumptionKcal());
+		assertEquals(900, response.dailyWaterConsumptionMl());
+	}
+
+	@Test
+	void currentUserRejectsTokenForDeletedUser() {
+		UUID userId = UUID.randomUUID();
+		when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+		assertThrows(InvalidSessionException.class, () -> authService.getCurrentUser(userId));
 	}
 }

@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.example.BLOCO.auth.exception.EmailAlreadyRegisteredException;
 import com.example.BLOCO.auth.exception.InvalidCredentialsException;
+import com.example.BLOCO.auth.exception.InvalidSessionException;
 import com.example.BLOCO.auth.dto.ApiErrorResponse;
 
 @RestControllerAdvice
@@ -27,6 +28,12 @@ public class ApiExceptionHandler {
 	public ResponseEntity<ApiErrorResponse> handleInvalidCredentials(InvalidCredentialsException exception) {
 		return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
 			.body(new ApiErrorResponse("INVALID_CREDENTIALS", exception.getMessage(), Map.of()));
+	}
+
+	@ExceptionHandler(InvalidSessionException.class)
+	public ResponseEntity<ApiErrorResponse> handleInvalidSession(InvalidSessionException exception) {
+		return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+			.body(new ApiErrorResponse("INVALID_SESSION", exception.getMessage(), Map.of()));
 	}
 
 	@ExceptionHandler(MethodArgumentNotValidException.class)

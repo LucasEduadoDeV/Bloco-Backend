@@ -73,6 +73,89 @@ autenticação permanece HttpOnly.
 
 Retorna o perfil público associado ao JWT válido do cookie `BLOCO_AUTH`.
 Respostas sem token, com token inválido ou expirado retornam `401 Unauthorized`.
+Os dados do perfil e as metas são lidos do usuário. Os campos
+`dailyCalorieConsumptionKcal` e `dailyWaterConsumptionMl` representam os totais
+consumidos na data atual, vindos do registro diário; sem registro, retornam `0`.
+Exemplo:
+
+```json
+{
+  "id": "uuid",
+  "name": "Nome Sobrenome",
+  "email": "pessoa@example.com",
+  "phone": null,
+  "age": 29,
+  "gender": "FEMALE",
+  "heightCm": 170.5,
+  "weightKg": 62.4,
+  "activityLevel": 3,
+  "basalMetabolicRateKcal": 1650,
+  "estimatedDailyEnergyExpenditureKcal": 2558,
+  "dailyCalorieConsumptionKcal": 2100,
+  "waterConsumptionGoalMl": 2500,
+  "dailyWaterConsumptionMl": 900
+}
+```
+
+## `PUT /api/v1/me/profile`
+
+Atualiza os dados do perfil usados para a configuração do TMB. Exige JWT no
+cookie `BLOCO_AUTH` e proteção CSRF (`XSRF-TOKEN` e `X-XSRF-TOKEN`). Todos os
+campos são obrigatórios. Altura e peso aceitam unidades métricas ou imperiais;
+o backend converte e armazena em centímetros e quilogramas.
+
+Exemplo com unidades imperiais:
+
+```json
+{
+  "gender": "FEMALE",
+  "ageYears": 29,
+  "height": {
+    "unit": "FT_IN",
+    "feet": 5,
+    "inches": 7
+  },
+  "weight": {
+    "unit": "LB",
+    "value": 150
+  },
+  "activityLevel": 3
+}
+```
+
+Para unidades métricas, informe `height: {"unit":"CM","value":170.18}` e
+`weight: {"unit":"KG","value":68.04}`. Não envie campos de outra unidade no
+mesmo objeto de medida.
+
+`gender` aceita `FEMALE` ou `MALE`; `activityLevel` aceita os códigos `1` a `5`
+(sedentário, levemente ativo, moderadamente ativo, muito ativo e extremamente
+ativo). A idade deve estar entre 1 e 120 anos, a altura entre 50 e 250 cm, e o
+peso entre 20 e 300 kg após conversão.
+
+Em sucesso, retorna `200 OK` com o perfil normalizado:
+
+```json
+{
+  "id": "uuid",
+  "gender": "FEMALE",
+  "ageYears": 29,
+  "heightCm": 170.18,
+  "weightKg": 68.04,
+  "activityLevel": 3,
+  "basalMetabolicRateKcal": 1438,
+  "estimatedDailyEnergyExpenditureKcal": 2229
+}
+```
+
+Entradas inválidas retornam `400 Bad Request` no formato de erro padrão da API.
+Ao salvar o perfil, o endpoint calcula e salva `basalMetabolicRateKcal` pela fórmula Mifflin–St Jeor:
+`10 × peso(kg) + 6,25 × altura(cm) − 5 × idade(anos) + 5` para `MALE` e a mesma
+fórmula com `−161` para `FEMALE`, arredondando o resultado para o inteiro mais
+próximo. Também calcula `estimatedDailyEnergyExpenditureKcal` como TMB
+multiplicada pelo fator de manutenção do nível: `1.20`, `1.375`, `1.55`,
+`1.725` ou `1.90`, respectivamente, arredondando para kcal inteiras. Esse valor
+é uma estimativa de gasto para manutenção, não é uma meta de consumo e não
+inclui déficit ou superávit. O `GET /api/v1/me` reflete os dados calculados.
 
 ## `POST /api/v1/logout`
 

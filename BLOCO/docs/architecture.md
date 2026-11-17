@@ -13,7 +13,23 @@ do Spring. A implementação está organizada por funcionalidade:
   diretamente pela API.
 - `auth/exception`: erros específicos do fluxo de autenticação.
 - `user/entity` e `user/repository`: entidade `UserAccount` e acesso à
-  persistência.
+  persistência. `users` armazena TMB (`basalMetabolicRateKcal`, kcal/dia), gasto
+  diário estimado para manutenção (`estimatedDailyEnergyExpenditureKcal`,
+  kcal/dia) e meta diária de água (`waterConsumptionGoalMl`, ml/dia). A TMB usa
+  Mifflin–St Jeor e o gasto diário aplica um fator de atividade; nenhum dos dois
+  define déficit ou superávit calórico.
+  O perfil também contém idade, gênero (`FEMALE`/`MALE`), altura em
+  centímetros, peso em quilogramas e nível de atividade (`ActivityLevel`):
+  `1` sedentário, `2` levemente ativo, `3` moderadamente ativo, `4` muito
+  ativo e `5` extremamente ativo. Esses dados ficam sem valor até serem
+  configurados.
+- `daily_intakes` guarda um registro por usuário e data, com calorias (kcal) e
+  água (ml) consumidas; sem registro para o dia, o `/me` retorna `0` para ambos.
+- `user/controller`, `user/service` e `user/dto`: atualização do perfil em
+  `PUT /api/v1/me/profile`. Altura e peso recebidos em cm/pés-polegadas e
+  kg/lb são normalizados e persistidos como cm e kg. O cálculo da TMB é
+  isolado em `BasalMetabolicRateCalculator`; `DailyEnergyExpenditureCalculator`
+  aplica o fator correspondente ao nível de atividade.
 - `common/web`: tratamento compartilhado de erros HTTP.
 - `config`: configuração do Spring Security.
 

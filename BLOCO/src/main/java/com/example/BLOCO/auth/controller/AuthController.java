@@ -15,23 +15,26 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import lombok.RequiredArgsConstructor;
-
 import com.example.BLOCO.auth.service.AuthService;
 import com.example.BLOCO.auth.service.JwtService;
+import com.example.BLOCO.auth.dto.CurrentUserResponse;
 import com.example.BLOCO.auth.dto.LoginRequest;
 import com.example.BLOCO.auth.dto.RegisterRequest;
 import com.example.BLOCO.auth.dto.UserResponse;
 
 @RestController
 @RequestMapping("/api/v1")
-@RequiredArgsConstructor
 public class AuthController {
 
 	private final AuthService authService;
 	private final JwtService jwtService;
 
-    @PostMapping("/register")
+	public AuthController(AuthService authService, JwtService jwtService) {
+		this.authService = authService;
+		this.jwtService = jwtService;
+	}
+
+	@PostMapping("/register")
 	public ResponseEntity<UserResponse> register(@Valid @RequestBody RegisterRequest request) {
 		return ResponseEntity.status(HttpStatus.CREATED)
 			.cacheControl(CacheControl.noStore())
@@ -48,12 +51,8 @@ public class AuthController {
 	}
 
 	@GetMapping("/me")
-	public UserResponse currentUser(@AuthenticationPrincipal Jwt jwt) {
-		return new UserResponse(
-			UUID.fromString(jwt.getSubject()),
-			jwt.getClaimAsString("name"),
-			jwt.getClaimAsString("email"),
-			jwt.getClaimAsString("phone"));
+	public CurrentUserResponse currentUser(@AuthenticationPrincipal Jwt jwt) {
+		return authService.getCurrentUser(UUID.fromString(jwt.getSubject()));
 	}
 
 	@PostMapping("/logout")

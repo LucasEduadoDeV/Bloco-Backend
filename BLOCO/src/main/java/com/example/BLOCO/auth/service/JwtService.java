@@ -38,12 +38,7 @@ public class JwtService {
 			.issuer(issuer)
 			.issuedAt(issuedAt)
 			.expiresAt(issuedAt.plus(accessTokenTtl))
-			.subject(user.id().toString())
-			.claim("email", user.email())
-			.claim("name", user.name());
-		if (user.phone() != null) {
-			claims.claim("phone", user.phone());
-		}
+			.subject(user.id().toString());
 		String token = jwtEncoder.encode(JwtEncoderParameters.from(
 			JwsHeader.with(MacAlgorithm.HS256).build(), claims.build())).getTokenValue();
 
